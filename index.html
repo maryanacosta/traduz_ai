@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Traduz Ai</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <div class="container">
+    <header class="brand">
+      <div class="brand-left">
+        <div class="header-logo">
+          <img src="icone.jpg" alt="Logo Evidência Atual" />
+        </div>
+        <div class="titles">
+          <h1>Traduz Ai</h1>
+          <p class="subtitle">A ciência explicada de forma clara, direta e acessível.</p>
+        </div>
+      </div>
+    </header>
+
+    <section class="mitos-grid" id="container-mitos" aria-label="Lista de mitos"></section>
+
+    <main id="container-artigos" aria-live="polite"></main>
+  </div>
+
+  <script>
+    function abrirArtigo(urlArtigo, urlPdf, temDownload) {
+      if (temDownload && urlPdf) {
+        // Tenta abrir o PDF direto em uma nova aba
+        const janela = window.open(urlPdf, '_blank');
+        
+        // Se a janela foi bloqueada pelo navegador (Popup Blocker), oferece a contingência
+        if (!janela || janela.closed) {
+          const confirmar = confirm(
+            "O PDF direto foi bloqueado pelo bloqueador de popups do seu navegador.\n\n" +
+            "Deseja abrir a página estável do artigo original como alternativa?"
+          );
+          if (confirmar) window.open(urlArtigo, '_blank');
+        }
+      } else {
+        // Fallback: Abre a página comum do artigo se não houver PDF mapeado
+        window.open(urlArtigo, '_blank');
+      }
+    }
+    let botaoAtivo = null;
+    let lecturaAtual = null;
+    let bancoMitosGlobal = [];
+    let mitoAbertoAtual = null; // Rastreia o ID do mito que está aberto na tela
+
+    async function inicializarBanco() {
+      try {
+        const resposta = await fetch('mitos.json');
+        if (!resposta.ok) throw new Error('Arquivo não encontrado');
+        bancoMitosGlobal = await resposta.json();
+      } catch (erro) {
+        console.warn("⚠️ Usando cache local.", erro);
+        bancoMitosGlobal = [{
+          "id": "protetor-solar-causa-cancer",
+          "titulo_mito": "Protetor solar causa câncer de pele e faz mal",
+          "artigos": [{
+            "posicao": 1,
+            "titulo": "The efficacy and safety of sunscreen use for the prevention of skin cancer",
+            "titulo_pt": "A eficácia e a segurança do uso de protetor solar para prevenção do câncer de pele",
+            "ano": 2020,
+            "autores": "Smith, J.; Doe, A.",
+            "score_relevancia": 58.5,
+            "ilf_original": 32.14,
+            "ilf_leve": 54.42,
+            "ilf_forte": 78.91,
+            "url_artigo": "https://api.semanticscholar.org/",
+            "tem_download_direto": true,
+            "leve": "O estudo de 2020 comprova a eficácia dos mecanismos de proteção contra a radiação solar na redução do câncer.",
+            "forte": "A pesquisa mostra que o uso correto do protetor solar protege a pele e reduz riscos."
+          }]
+        }];
+      }
+      renderizarBotoesMitos();
+    }
+
+    function renderizarBotoesMitos() {
+      const container = document.getElementById("container-mitos");
+      container.innerHTML = "";
+      bancoMitosGlobal.forEach(mito => {
+        const btn = document.createElement("button");
+        btn.className = "mito-btn";
+        btn.type = "button";
+        btn.id = `btn-${mito.id}`; // Adiciona um ID ao botão para estilização dinâmica se necessário
+        btn.textContent = `${mito.titulo_mito}?`;
+        btn.onclick = () => carregarMitoPorId(mito.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function carregarMitoPorId(idMito) {
+      const containerArtigos = document.getElementById("container-artigos");
+      
+      // Se o usuário clicar no mito que já está aberto, "desclica" e fecha tudo
+      if (mitoAbertoAtual === idMito) {
+        containerArtigos.innerHTML = "";
+        pararAudioCompleto();
+        
+        // Remove a classe de destaque do botão
+        const btnAnterior = document.getElementById(`btn-${idMito}`);
+        if (btnAnterior) btnAnterior.classList.remove("ativo");
+        
+        mitoAbertoAtual = null;
+        return;
+      }
+
+      // Se havia outro mito aberto, remove o estado ativo do botão dele
+      if (mitoAbertoAtual) {
+        const btnAnterior = document.getElementById(`btn-${mitoAbertoAtual}`);
+        if (btnAnterior) btnAnterior.classList.remove("ativo");
+      }
+
+      containerArtigos.innerHTML = "";
+      pararAudioCompleto();
+
+      const mito = bancoMitosGlobal.find(m => m.id === idMito);
+      if (!mito) {
+        containerArtigos.innerHTML = `<p class="text-content error">⚠️ Dados do mito não encontrados.</p>`;
+        return;
+      }
+
+      // Marca o novo mito como aberto e destaca o botão correspondente
+      mitoAbertoAtual = idMito;
+      const btnAtual = document.getElementById(`btn-${idMito}`);
+      if (btnAtual) btnAtual.classList.add("ativo");
+
+      mito.artigos.forEach(art => {
+        const article = document.createElement("article");
+        article.className = "news-card";
+
+        article.innerHTML = `
+          <h3 class="article-title"><b>#${art.posicao}</b> ${art.titulo_pt || art.titulo}</h3>
+          <div class="article-meta">Título original: <i>${art.titulo}</i> · <b>Ano:</b> ${art.ano} · <b>Autores:</b> ${art.autores}</div>
+
+          <div class="badge-container" aria-hidden="true">
+            <span class="badge badge-relevancia"> Relevância: ${art.score_relevancia || "0.0"}</span>
+            <span class="badge badge-ilf-orig"> Complexidade Original: ${art.ilf_original || "0.0"}</span>
+            <span class="badge badge-ilf-leve"> Eficiência Nível 1: ${art.ilf_leve || "0.0"}%</span>
+            <span class="badge badge-ilf-forte"> Eficiência Nível 2: ${art.ilf_forte || "0.0"}%</span>
+          </div>
+
+          <div class="text-block source-block">
+            <h4>Fonte científica</h4>
+            <p class="text-content small">Acesse o link do artigo: </p>
+            <div class="links-row">
+              <a href="${art.url_artigo}" target="_blank" rel="noopener" class="link-btn">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Acessar Página do Artigo
+              </a>
+            </div>
+          </div>
+
+          <div class="text-block" id="bloco-leve-${art.posicao}">
+            <h4>Nível 1: Divulgação Científica</h4>
+            <p class="text-content" id="txt-leve-${art.posicao}"></p>
+            <button class="btn-audio" type="button" onclick="controlarAudio('txt-leve-${art.posicao}', this)"> Ouvir Explicação</button>
+          </div>
+
+          <div class="text-block" id="bloco-forte-${art.posicao}">
+            <h4>Nível 2: Acessibilidade Direta</h4>
+            <p class="text-content text-content-strong" id="txt-forte-${art.posicao}"></p>
+            <button class="btn-audio" type="button" onclick="controlarAudio('txt-forte-${art.posicao}', this)"> Ouvir Leitura Fácil</button>
+          </div>
+        `;
+
+        containerArtigos.appendChild(article);
+
+        document.getElementById(`txt-leve-${art.posicao}`).textContent = art.leve || art.simplificado_leve || "";
+        document.getElementById(`txt-forte-${art.posicao}`).textContent = art.forte || art.simplificado_forte || "";
+      });
+
+      window.scrollTo({ top: 400, behavior: 'smooth' });
+    }
+
+    function controlarAudio(idTexto, botao) {
+      if (botaoAtivo === botao) {
+        pararAudioCompleto();
+        return;
+      }
+      pararAudioCompleto();
+
+      const elementoTexto = document.getElementById(idTexto);
+      if (!elementoTexto) return;
+
+      botaoAtivo = botao;
+      lecturaAtual = idTexto;
+
+      botao.classList.add('tocando');
+      const originalLabel = botao.textContent;
+      botao.dataset.label = originalLabel;
+      botao.textContent = "⏹️ Parar Leitura";
+
+      const utterance = new SpeechSynthesisUtterance(elementoTexto.textContent);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 1.0;
+
+      utterance.onend = () => pararAudioCompleto();
+      utterance.onerror = () => pararAudioCompleto();
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function pararAudioCompleto() {
+      window.speechSynthesis.cancel();
+      if (botaoAtivo) {
+        botaoAtivo.classList.remove('tocando');
+        if (botaoAtivo.dataset.label) botaoAtivo.textContent = botaoAtivo.dataset.label;
+      }
+      botaoAtivo = null;
+      lecturaAtual = null;
+    }
+
+    window.onload = inicializarBanco;
+  </script>
+</body>
+</html>

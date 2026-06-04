@@ -1,0 +1,24 @@
+# Chaves privadas de API
+.env
+.env.local
+.env.*.local
+
+# Ignora a pasta de dependências locais do projeto
+.venv/
+venv/
+ENV/
+env/
+build/
+dist/
+*.egg-info/
+
+# Chaches e arquivos temporários
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Arquivos temporários do sistema operacional
+.DS_Store
+Thumbs.db

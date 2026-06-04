@@ -1,0 +1,23 @@
+# Requisições e Dados
+requests
+pandas
+
+# NLP e Métricas
+spacy
+pyphen
+deep-translator
+sentence-transformers
+
+# Deep Learning / Hugging Face
+torch
+transformers
+
+# LLMs Externos
+google-genai
+groq
+
+# Utilitários
+python-dotenv
+
+# Análise Semântica
+scikit-learn
