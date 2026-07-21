@@ -19,7 +19,6 @@ O Traduz AI é uma plataforma de Ciência Aberta baseada em Retrieval-Augmented 
 
 ## Arquitetura do Sistema
 
-```text
            Mito em Saúde
                   │
                   ▼
